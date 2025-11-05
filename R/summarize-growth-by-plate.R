@@ -53,6 +53,9 @@
 #'                   96-well plate.
 #' @param height_    The number of plate rows. Defaults to 8 for typical
 #'                   96-well plates.
+#' @param layout_dir  The direction in which plots are filled across the plate layout.
+#'                    Use `"col"` to fill plots by column (default) or `"row"` to fill
+#'                    plots by row.
 #' @return           A data.table containing the summary metrics and residual
 #'                   error from the fit of the logistic curve to the data.
 #'                   The names of the input columns are used to identify each
@@ -88,12 +91,13 @@ SummarizeGrowthByPlate <- function(plate,
                                    plot_file = "growthcurver.pdf",
                                    width_ = 12,
                                    height_ = 8) {
+                                   height_ = 8,
+                                   layout_dir = c("col", "row")) {
 
   # make sure that the input is a data.frame
   if (is.data.frame(plate) != TRUE) {
     stop("The 'plate' input data must be formatted as a data.frame.", call. = FALSE)
   }
-
   # make sure that there is a column named "time" in the input
   if (length(grep("time", names(plate), ignore.case = TRUE)) != 1) {
     stop("There must be exactly one column named 'time' in the 'plate' data.frame.",
@@ -101,12 +105,10 @@ SummarizeGrowthByPlate <- function(plate,
   }
   # make sure "time" column is named as expected (in lowercase)
   names(plate)[grep("time", names(plate), ignore.case = TRUE)] <- "time"
-
   # make sure that there are at least two columns in the input
   if (length(names(plate)) < 2) {
     stop("You must have at least two columns in the 'plate' data.frame: one for time, and the other for absorbance.")
   }
-
   if (bg_correct == "blank") {
     # check that there is a column in the plate data.frame containing the blanks
     if (length(grep("blank", names(plate), ignore.case = TRUE)) != 1) {
@@ -116,7 +118,6 @@ SummarizeGrowthByPlate <- function(plate,
     # make sure "blank" column is named as expected (in lowercase)
     names(plate)[grep("blank", names(plate), ignore.case = TRUE)] <- "blank"
   }
-
   # create the output data frame
   n <- length(plate) -
        sum(grepl("time|plate", names(plate), ignore.case = TRUE))
@@ -133,18 +134,22 @@ SummarizeGrowthByPlate <- function(plate,
                      stringsAsFactors = FALSE)
 
   if (plot_fit == TRUE) {
+    layout_dir = match.arg(layout_dir)
     grDevices::cairo_pdf(plot_file, width = width_, height = height_)
     old_par <- graphics::par(mfcol = c(height_, width_), mar = c(0.25, 0.25, 0.25, 0.25))
+    if (layout_dir == "col") {
+      old_par <- graphics::par(mfcol = c(height_, width_), mar = c(0.25, 0.25, 0.25, 0.25))
+    } else if(layout_dir == "row") {
+      old_par <- graphics::par(mfrow = c(height_, width_), mar = c(0.25, 0.25, 0.25, 0.25))
+    }
     idx_to_plot <- length(plate$time) * 1:20 / 20
     y_lim_max <- max(plate[,setdiff(names(plate), "time")]) -
                  min(plate[,setdiff(names(plate), "time")])
   }
-
   n <- 1
   for (col_name in names(plate)) {
     if (!col_name %in% c("time", "blank")) {
       # process just the well columns, skipping the time and blank columns
-
       if (bg_correct == "blank") {
         gc_fit <- SummarizeGrowth(data_t = plate$time,
                                   data_n = plate[, col_name],
@@ -158,7 +163,6 @@ SummarizeGrowthByPlate <- function(plate,
                                   t_trim = t_trim,
                                   bg_correct = bg_correct)
       }
-
       # now, add the metrics from this column to the output data
       d_gc$sample[n] <- col_name
       d_gc$k[n] <- gc_fit$vals$k
@@ -171,7 +175,6 @@ SummarizeGrowthByPlate <- function(plate,
       d_gc$sigma[n] <- gc_fit$vals$sigma
       d_gc$note[n] <- gc_fit$vals$note
       n <- n + 1
-
       # plot, if necessary
       if (plot_fit == TRUE) {
         graphics::plot(gc_fit$data$t[idx_to_plot],
@@ -191,11 +194,8 @@ SummarizeGrowthByPlate <- function(plate,
       }
     }
   }
-
   if (plot_fit == TRUE) {
     grDevices::dev.off()
   }
-
   return(d_gc)
-
 }
