@@ -90,7 +90,6 @@ SummarizeGrowthByPlate <- function(plate,
                                    plot_fit = FALSE,
                                    plot_file = "growthcurver.pdf",
                                    width_ = 12,
-                                   height_ = 8) {
                                    height_ = 8,
                                    layout_dir = c("col", "row")) {
 
